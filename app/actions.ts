@@ -22,10 +22,10 @@ export async function generateImage(formData: FormData) {
       {
         input: {
           // ⚠️ 已更新為你的指定 Prompt
-          prompt: "a CNY greeting photo of this person, in 9:16 ratio, do not include any text / 中文字 in the image. Do not temple in the image. Person should not hold fruit. 注意人物輪廓細節。",
+          prompt: "a CNY greeting photo of this person, in 9:16 ratio. 光線柔和均勻, 營造專業時尚雜誌感。臉部呈現模特兒人物特徵, 輪廓立體自然, 樣貌輪廓需至少99%似模特兒。Do not add or remove eyeglasses of the person. Do not include any text / 中文字 / temple in the image. 半身照或近身照。",
           image_input: [dataUri],
           negative_prompt: "text, watermark, ugly, distorted, low quality, snake, zodiac, fruit, temple, religious symbols",
-          resolution: "2K",
+          resolution: "1K",
           aspect_ratio: "9:16",
           output_format: "png",
           safety_filter_level: "block_only_high"
@@ -49,7 +49,7 @@ export async function generateVideo(imageUrl: string) {
       {
         input: {
           image: imageUrl,
-          prompt: "Slow cinematic camera pan, festive atmosphere, glowing lights, 4k resolution, smooth motion",
+          prompt: "a CNY greeting video of this person, slow cinematic camera, festive atmosphere, 4k resolution, smooth motion",
           duration: 4, 
           resolution: "720p", 
           aspect_ratio: "9:16",
