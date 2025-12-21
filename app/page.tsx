@@ -92,7 +92,7 @@ const RichLoader = ({ statusText }: { statusText: string }) => {
   );
 };
 
-// --- Component: Cinematic Player (Result Video - Robust Fix) ---
+// --- Component: Cinematic Player (Result Video - Pause Fixed) ---
 const CinematicPlayer = ({ videoUrl }: { videoUrl: string }) => {
   const [visibleLayer, setVisibleLayer] = useState<0 | 1 | 2>(0);
   const [isMuted, setIsMuted] = useState(true);
@@ -105,7 +105,7 @@ const CinematicPlayer = ({ videoUrl }: { videoUrl: string }) => {
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = 0.4; }, []);
   
-  // 🟢 Core Logic: React to 'visibleLayer' change
+  // 🟢 Core Logic: React to 'visibleLayer' AND 'isPlaying'
   useEffect(() => {
     const refs = [introRef.current, mainRef.current, outroRef.current];
     refs.forEach((v, idx) => {
@@ -113,17 +113,17 @@ const CinematicPlayer = ({ videoUrl }: { videoUrl: string }) => {
       v.muted = isMuted; // Sync mute state
       
       if (idx === visibleLayer) {
-        // Active layer: Reset and Play
+        // Active layer
         if (isPlaying) {
-           // Ensure we reset time only if it's not already playing correct segment to avoid glitches
-           // But for simplicity and robustness in sequencing:
-           // We rely on the fact that we switch layers onEnded.
            v.play().catch(e => console.log("Play error:", e)); 
+        } else {
+           // 🟢 FIX: Explicitly pause active video when not playing
+           v.pause();
         }
       } else {
         // Inactive layer: Pause and Reset
         v.pause();
-        v.currentTime = 0; // Reset for next time
+        v.currentTime = 0; 
       }
     });
 
@@ -135,7 +135,6 @@ const CinematicPlayer = ({ videoUrl }: { videoUrl: string }) => {
     }
   }, [visibleLayer, isPlaying, isMuted]);
 
-  // 🟢 Simple Transition: Just switch state, let useEffect handle playback
   const handleVideoEnd = (nextId: number) => {
     setVisibleLayer(nextId as 0 | 1 | 2);
   };
@@ -152,7 +151,7 @@ const CinematicPlayer = ({ videoUrl }: { videoUrl: string }) => {
           key={vid.id} 
           ref={vid.ref} 
           src={vid.src} 
-          autoPlay={vid.id === 0} // Only Intro autoplay initially
+          autoPlay={vid.id === 0} 
           playsInline 
           muted={isMuted} 
           preload="auto" 
@@ -160,8 +159,6 @@ const CinematicPlayer = ({ videoUrl }: { videoUrl: string }) => {
           onEnded={() => handleVideoEnd(vid.next)} 
         />
       ))}
-      
-      {/* Controls */}
       <div className="absolute top-4 right-4 flex gap-3 z-50">
         <button onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 border border-white/20">
            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
@@ -420,19 +417,11 @@ export default function Home() {
                   className="w-full max-w-[340px] md:max-w-[420px] bg-white aspect-[3/4] rounded-[1rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] p-8 flex flex-col items-center text-center justify-between border border-[#EAE8E0] relative overflow-hidden group"
                >
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1px] h-12 bg-[#D4B886]"></div>
-                  
                   <div className="mt-6 space-y-4">
-                     <div className="inline-block px-3 py-1 bg-[#C25E55]/10 text-[#C25E55] text-[10px] tracking-[0.2em] font-bold uppercase rounded-sm">
-                        CNY 2026
-                     </div>
-                     <h1 className="text-4xl md:text-5xl font-serif leading-tight text-[#4A403A]">
-                        AI <br/><span className="text-[#C25E55] italic">新春造型</span>
-                     </h1>
-                     <p className="text-sm md:text-base text-[#4A403A]/60 tracking-wider leading-relaxed pt-2">
-                        上載一張相<br/>為你訂製專屬賀年短片
-                     </p>
+                     <div className="inline-block px-3 py-1 bg-[#C25E55]/10 text-[#C25E55] text-[10px] tracking-[0.2em] font-bold uppercase rounded-sm">CNY 2026</div>
+                     <h1 className="text-4xl md:text-5xl font-serif leading-tight text-[#4A403A]">AI <br/><span className="text-[#C25E55] italic">新春造型</span></h1>
+                     <p className="text-sm md:text-base text-[#4A403A]/60 tracking-wider leading-relaxed pt-2">上載一張相<br/>為你訂製專屬賀年短片</p>
                   </div>
-
                   <div className="w-full space-y-4 mb-2">
                      <label className="relative block w-full group/btn cursor-pointer">
                         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
