@@ -92,71 +92,101 @@ const RichLoader = ({ statusText }: { statusText: string }) => {
   );
 };
 
-// --- Component: Cinematic Player (Result Video) ---
+// --- Component: Cinematic Player (Result Video - Robust Fix) ---
 const CinematicPlayer = ({ videoUrl }: { videoUrl: string }) => {
   const [visibleLayer, setVisibleLayer] = useState<0 | 1 | 2>(0);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
+  
   const introRef = useRef<HTMLVideoElement>(null);
   const mainRef = useRef<HTMLVideoElement>(null);
   const outroRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = 0.4; }, []);
+  
+  // 🟢 Core Logic: React to 'visibleLayer' change
   useEffect(() => {
     const refs = [introRef.current, mainRef.current, outroRef.current];
     refs.forEach((v, idx) => {
       if (!v) return;
-      v.muted = isMuted;
-      if (isPlaying) { if (idx === visibleLayer) v.play().catch(() => {}); } else { v.pause(); }
+      v.muted = isMuted; // Sync mute state
+      
+      if (idx === visibleLayer) {
+        // Active layer: Reset and Play
+        if (isPlaying) {
+           // Ensure we reset time only if it's not already playing correct segment to avoid glitches
+           // But for simplicity and robustness in sequencing:
+           // We rely on the fact that we switch layers onEnded.
+           v.play().catch(e => console.log("Play error:", e)); 
+        }
+      } else {
+        // Inactive layer: Pause and Reset
+        v.pause();
+        v.currentTime = 0; // Reset for next time
+      }
     });
+
+    // BGM Logic
     if (audioRef.current) {
       audioRef.current.muted = isMuted;
-      if (isPlaying) audioRef.current.play().catch(() => {}); else audioRef.current.pause();
+      if (isPlaying) audioRef.current.play().catch(() => {});
+      else audioRef.current.pause();
     }
-  }, [isPlaying, isMuted, visibleLayer]);
+  }, [visibleLayer, isPlaying, isMuted]);
 
-  const transitionTo = (targetLayer: 0 | 1 | 2) => {
-    const targetRef = [introRef, mainRef, outroRef][targetLayer];
-    if (targetRef.current) {
-      targetRef.current.currentTime = 0;
-      targetRef.current.play().then(() => setVisibleLayer(targetLayer)).catch(() => setVisibleLayer(targetLayer));
-    }
+  // 🟢 Simple Transition: Just switch state, let useEffect handle playback
+  const handleVideoEnd = (nextId: number) => {
+    setVisibleLayer(nextId as 0 | 1 | 2);
   };
 
   return (
-    <div className="relative w-full h-full bg-black overflow-hidden rounded-[inherit]">
+    <div className="absolute inset-0 w-full h-full bg-black overflow-hidden rounded-[inherit]">
       <audio ref={audioRef} src="/bgm.mp3" loop />
       {[
         { ref: introRef, src: "/intro.mp4", id: 0, next: 1 },
         { ref: mainRef, src: videoUrl, id: 1, next: 2 },
         { ref: outroRef, src: "/outro.mp4", id: 2, next: 0 }
       ].map((vid) => (
-        <video key={vid.id} ref={vid.ref} src={vid.src} className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${visibleLayer === vid.id ? 'opacity-100 z-20' : 'opacity-0 z-0'}`} playsInline muted={isMuted} preload="auto" onEnded={() => transitionTo(vid.next as 0|1|2)} />
+        <video 
+          key={vid.id} 
+          ref={vid.ref} 
+          src={vid.src} 
+          autoPlay={vid.id === 0} // Only Intro autoplay initially
+          playsInline 
+          muted={isMuted} 
+          preload="auto" 
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${visibleLayer === vid.id ? 'opacity-100 z-20' : 'opacity-0 z-0'}`} 
+          onEnded={() => handleVideoEnd(vid.next)} 
+        />
       ))}
+      
+      {/* Controls */}
       <div className="absolute top-4 right-4 flex gap-3 z-50">
-        <button onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 border border-white/20">{isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}</button>
-        <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 border border-white/20">{isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}</button>
+        <button onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 border border-white/20">
+           {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+        </button>
+        <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 border border-white/20">
+           {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+        </button>
       </div>
     </div>
   );
 };
 
-// --- Component: Interactive Demo Player (🟢 Updated Logic) ---
+// --- Component: Interactive Demo Player ---
 const InteractiveDemoPlayer = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false); // Default unmuted logic
+  const [isMuted, setIsMuted] = useState(false); 
 
-  // Handle Initial Play (Big Button)
   const handleStartPlay = () => {
     if (videoRef.current) {
-      videoRef.current.muted = false; // Try to unmute immediately
+      videoRef.current.muted = false; 
       videoRef.current.play().then(() => {
         setIsPlaying(true);
-        setIsMuted(false); // Success: Unmuted
+        setIsMuted(false);
       }).catch(() => {
-        // Fallback: Browser blocked sound, force mute
         if (videoRef.current) {
            videoRef.current.muted = true;
            videoRef.current.play();
@@ -170,11 +200,8 @@ const InteractiveDemoPlayer = () => {
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
-    } else {
-      videoRef.current.play();
-    }
+    if (isPlaying) videoRef.current.pause();
+    else videoRef.current.play();
     setIsPlaying(!isPlaying);
   };
 
@@ -187,17 +214,14 @@ const InteractiveDemoPlayer = () => {
 
   return (
     <div className="relative w-full aspect-[9/16] bg-black rounded-[1rem] overflow-hidden shadow-2xl ring-4 ring-white group cursor-pointer" onClick={!isPlaying ? handleStartPlay : undefined}>
-       {/* 🟢 Video Element with 'loop' */}
        <video 
          ref={videoRef}
          src="/demo.mp4" 
          className="w-full h-full object-cover" 
          loop 
          playsInline 
-         // Removed autoPlay
        />
        
-       {/* 1. Big Play Button (Overlay) - Visible when NOT playing */}
        {!isPlaying && (
          <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px] transition-all duration-500 group-hover:bg-black/30">
             <motion.div 
@@ -211,19 +235,12 @@ const InteractiveDemoPlayer = () => {
          </div>
        )}
 
-       {/* 2. Small Controls (Bottom Right) - Visible ONLY when playing */}
        {isPlaying && (
           <div className="absolute bottom-4 right-4 flex gap-2 z-20">
-             <button 
-                onClick={togglePlay}
-                className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:bg-black/60 border border-white/10 transition-all"
-             >
+             <button onClick={togglePlay} className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:bg-black/60 border border-white/10 transition-all">
                 {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
              </button>
-             <button 
-                onClick={toggleMute}
-                className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:bg-black/60 border border-white/10 transition-all"
-             >
+             <button onClick={toggleMute} className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:bg-black/60 border border-white/10 transition-all">
                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
              </button>
           </div>
@@ -232,27 +249,21 @@ const InteractiveDemoPlayer = () => {
   );
 };
 
-// --- Component: Tutorial Section (Integrated) ---
+// --- Component: Tutorial Section ---
 const TutorialSection = () => {
   return (
     <div className="w-full max-w-[1280px] mx-auto py-20 px-6 md:px-12 flex flex-col md:flex-row gap-12 md:gap-20 items-start">
-      
-      {/* 1. Demo Video (Interactive) */}
       <div className="w-full md:w-1/3 flex flex-col gap-6">
         <div className="space-y-2">
             <h3 className="text-2xl font-serif text-[#4A403A]">簡單2步</h3>
             <div className="w-12 h-1 bg-[#D4B886]"></div>
         </div>
-        
-        {/* Interactive Player Here */}
         <InteractiveDemoPlayer />
-
         <p className="text-sm text-[#4A403A]/60 leading-relaxed text-justify">
            上傳相片，確認造型，即可完成個人賀年短片！
         </p>
       </div>
 
-      {/* 2. Photo Guidelines (Grid with Real Images) */}
       <div className="w-full md:w-2/3 flex flex-col gap-8">
          <div className="space-y-2">
             <h3 className="text-2xl font-serif text-[#4A403A]">相片指引</h3>
@@ -263,9 +274,7 @@ const TutorialSection = () => {
             {PHOTO_GUIDES.map((guide, idx) => (
                <div key={idx} className="flex flex-col gap-3 group">
                   <div className="relative w-full aspect-square bg-white rounded-lg overflow-hidden shadow-sm border border-[#EAE8E0] group-hover:shadow-md transition-shadow">
-                     {/* Real Image Render */}
                      <img src={guide.src} alt={guide.label} className="w-full h-full object-cover" />
-                     
                      <div className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs shadow-sm"
                           style={{ backgroundColor: guide.type === 'good' ? '#4E8B56' : '#C25E55' }}>
                         {guide.type === 'good' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
@@ -286,7 +295,7 @@ const TutorialSection = () => {
   );
 };
 
-// --- Component: Floating Upload Button (Consistent UI) ---
+// --- Component: Floating Upload Button ---
 const FloatingUploadBtn = ({ onClick }: { onClick: () => void }) => {
   return (
     <motion.div 
@@ -400,7 +409,7 @@ export default function Home() {
           {/* [LEFT] VISUAL AREA */}
           <motion.div layout className={`
             relative w-full order-2 md:order-1 flex items-center justify-center
-            ${step === 'UPLOAD' ? 'h-[60vh] md:h-full md:w-1/2 p-6' : 'h-[70%] md:h-full md:flex-1'}
+            ${step === 'UPLOAD' ? 'h-[65dvh] md:h-full md:w-1/2 p-6' : 'h-[65dvh] md:h-full md:flex-1'}
           `}>
             
             {/* STATE 1: UPLOAD CARD */}
@@ -438,12 +447,14 @@ export default function Home() {
                </motion.div>
             )}
 
-            {/* STATE 2 & 4: 9:16 VISUAL FRAME */}
+            {/* STATE 2 & 4: 9:16 VISUAL FRAME (Fixed for Mobile) */}
             {step !== 'UPLOAD' && step !== 'GENERATING' && (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }} 
                 animate={{ opacity: 1, scale: 1 }} 
-                className="relative shadow-2xl overflow-hidden bg-black mx-auto h-full max-h-full aspect-[9/16] md:h-[95vh] md:w-auto"
+                className="relative shadow-2xl overflow-hidden bg-black mx-auto 
+                           h-full w-auto aspect-[9/16] 
+                           md:h-[95vh] md:w-auto"
               >
                  {step === 'PREVIEW' && generatedImage && <img src={generatedImage} className="w-full h-full object-cover" />}
                  {step === 'RESULT' && videoUrl && <CinematicPlayer videoUrl={videoUrl} />}
@@ -454,7 +465,7 @@ export default function Home() {
           {/* [RIGHT] CONTROLS AREA */}
           <motion.div layout className={`
             relative flex flex-col justify-center order-3 md:order-2
-            ${step === 'UPLOAD' ? 'hidden' : 'w-full h-[30%] md:h-full md:w-[400px] lg:w-[420px] bg-white/60 md:bg-transparent backdrop-blur-md md:backdrop-blur-none border-t border-white/40 md:border-none p-6 md:p-8 md:pl-8 z-20'}
+            ${step === 'UPLOAD' ? 'hidden' : 'w-full h-[35dvh] md:h-full md:w-[400px] lg:w-[420px] bg-white/60 md:bg-transparent backdrop-blur-md md:backdrop-blur-none border-t border-white/40 md:border-none p-6 md:p-8 md:pl-8 z-20'}
           `}>
             <AnimatePresence mode="wait">
                {step === 'PREVIEW' && (
@@ -493,27 +504,18 @@ export default function Home() {
             </AnimatePresence>
           </motion.div>
 
-          {/* Scroll Indicator (Visible ONLY in UPLOAD Step) */}
-          {step === 'UPLOAD' && !loading && (
-             <ScrollIndicator />
-          )}
-
+          {step === 'UPLOAD' && !loading && <ScrollIndicator />}
         </div>
 
-        {/* === SECTION 2: TUTORIAL / INTRO (Only visible in UPLOAD step) === */}
         {step === 'UPLOAD' && !loading && (
            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
               <TutorialSection />
            </motion.div>
         )}
-
       </div>
 
       <style jsx global>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
+        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
       `}</style>
     </main>
   );
