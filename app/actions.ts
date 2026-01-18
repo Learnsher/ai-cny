@@ -25,7 +25,7 @@ export async function generateImage(formData: FormData) {
           prompt: "a CNY greeting photo of this person, in 9:16 ratio, do not include any text / 中文字 in the image. Do not temple in the image. Person should not hold fruit. 注意人物輪廓細節。",
           image_input: [dataUri],
           negative_prompt: "text, watermark, ugly, distorted, low quality, snake, zodiac, fruit, temple, religious symbols",
-          resolution: "2K",
+          resolution: "1K",
           aspect_ratio: "9:16",
           output_format: "png",
           safety_filter_level: "block_only_high"
@@ -49,7 +49,7 @@ export async function generateVideo(imageUrl: string) {
       {
         input: {
           image: imageUrl,
-          prompt: "Slow cinematic camera pan, festive atmosphere, glowing lights, 4k resolution, smooth motion",
+          prompt: "Slow cinematic camera pan and One person stays mid‑frame, festive atmosphere, glowing lights, 4k resolution, smooth motion",
           duration: 4, 
           resolution: "720p", 
           aspect_ratio: "9:16",
@@ -62,4 +62,5 @@ export async function generateVideo(imageUrl: string) {
     console.error("❌ Video Generation Failed:", error);
     throw new Error("Failed to generate video.");
   }
+
 }
